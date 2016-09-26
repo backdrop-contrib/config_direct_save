@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Drupal\config_direct_save\Form;
-
 
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Config\StorageInterface;
@@ -12,11 +10,11 @@ use Drupal\Component\Serialization\Yaml;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
+ * Provide the settings form for updating configurations.
  * Class UpdateConfigurationForm
  * @package Drupal\config_direct_save\Form
  */
 class UpdateConfigurationForm extends FormBase {
-
 
   /**
    * The target storage.
@@ -53,7 +51,6 @@ class UpdateConfigurationForm extends FormBase {
       $container->get('config.manager')
     );
   }
-
 
   /**
    * Constructs a ConfigController object.
@@ -100,6 +97,7 @@ class UpdateConfigurationForm extends FormBase {
       '#type' => 'submit',
       '#value' => $this->t('Update configuration'),
     );
+
     return $form;
   }
 
@@ -130,9 +128,7 @@ class UpdateConfigurationForm extends FormBase {
    * Override the old configurations.
    */
   public function createConfigFiles(array &$form, FormStateInterface $form_state) {
-    $config_directories = array_flip($GLOBALS['config_directories']);
     //Get the name of config source( sync, text, etc...).
-    $folder_source = $config_directories[$form_state->getValue('config_directory')];
     $config_directory_selected = $form_state->getValue('config_directory');
     //$config_manager = \Drupal::service('config.manager');
     $config_files_names = $this->configManager->getConfigFactory()->listAll();
@@ -165,9 +161,7 @@ class UpdateConfigurationForm extends FormBase {
           file_put_contents($config_directory_selected . "/" . $target . "/$name.yml", Yaml::encode($collection_storage->read($name)));
         }
       }
-
-    drupal_set_message("The configuration has been uploaded.");
-
+    drupal_set_message($this->t("The configuration has been uploaded."));
   }
 
   /***
@@ -203,7 +197,6 @@ class UpdateConfigurationForm extends FormBase {
     }
     $dir_handle->close();
     return TRUE;
-
   }
 
   /**
@@ -225,7 +218,5 @@ class UpdateConfigurationForm extends FormBase {
       }
     }
     closedir($dir);
-
-
   }
 }
