@@ -78,22 +78,22 @@ class UpdateConfigurationForm extends FormBase {
    *   The form structure.
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $form['config_directory'] = array(
+    $form['config_directory'] = [
       '#type' => 'select',
       '#required' => TRUE,
       '#title' => $this->t('Config source'),
       '#description' => $this->t('Select config source directory'),
       '#options' => array_flip($GLOBALS['config_directories']),
-    );
-    $form['backup'] = array(
+    ];
+    $form['backup'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Backup'),
       '#description' => $this->t('Check to make a backup for a specific config source(sync for example.)'),
-    );
-    $form['update'] = array(
+    ];
+    $form['update'] = [
       '#type' => 'submit',
       '#value' => $this->t('Update configuration'),
-    );
+    ];
 
     return $form;
   }
@@ -147,7 +147,7 @@ class UpdateConfigurationForm extends FormBase {
         file_put_contents($config_directory_selected . "/" . $target . "/$name.yml", Yaml::encode($collection_storage->read($name)));
       }
     }
-    drupal_set_message($this->t("The configuration has been uploaded."));
+    $this->messenger()->addMessage($this->t("The configuration has been uploaded."));
   }
 
   /**
