@@ -203,12 +203,4 @@ class UpdateConfigurationForm extends FormBase {
     return TRUE;
   }
 
-  /**
-   * Get the path of the directory.
-   */
-  protected function getConfigDirectory($directory = 'sync') {
-    $config_directories = $GLOBALS['config_directories'][$directory];
-    return $config_directories;
-  }
-
 }
