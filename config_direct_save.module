@@ -6,13 +6,14 @@
 function config_direct_save_menu() {
   $items = [];
 
-  $items['admin/config/development/configuration/full/update'] = [
+  $items['admin/config/development/configuration/update'] = [
     'title' => 'Update',
     'page callback' => 'backdrop_get_form',
     'page arguments' => ['config_direct_save_update_configuration_form'],
     'access callback' => 'user_access',
     'access arguments' => ['administer site configuration'],
-    'type' => MENU_LOCAL_TASK, // Adds this as a tab.
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 1,
   ];
 
   return $items;
