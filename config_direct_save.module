@@ -1,20 +1,115 @@
 <?php
 
 /**
- * @file
- * Allows to export configuration after changes.
+ * Implements hook_menu().
  */
+function config_direct_save_menu() {
+  $items = [];
 
-use Drupal\Core\Routing\RouteMatchInterface;
+  $items['admin/config/development/configuration/full/update'] = [
+    'title' => 'Update',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => ['config_direct_save_update_configuration_form'],
+    'access callback' => 'user_access',
+    'access arguments' => ['administer site configuration'],
+    'type' => MENU_LOCAL_TASK, // Adds this as a tab.
+  ];
+
+  return $items;
+}
 
 /**
- * Implements hook_help().
+ * Build the update configuration form.
  */
-function config_direct_save_help($route_name, RouteMatchInterface $route_match) {
-  switch ($route_name) {
-    case 'config_direct_save.update_configuration_form':
-      $output = '';
-      $output .= '<p>' . t('Update the full configuration of this site in the sync directory.') . '</p>';
-      return $output;
+function config_direct_save_update_configuration_form($form, &$form_state) {
+  global $config_directories;
+
+  // Dropdown with "Staging" as the only option, for consistency with Drupal module UI.
+  $form['config_directory'] = [
+    '#type' => 'select',
+    '#title' => t('Config source'),
+    '#description' => t('Select config source directory'),
+    '#options' => ['staging' => t('Staging')], // Only one option.
+    '#default_value' => 'staging',
+    '#disabled' => FALSE, // Disabled to show it's not editable.
+  ];
+
+  $form['backup'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Backup'),
+    '#description' => t('Check to make a backup of the staging directory before exporting.'),
+  ];
+
+  $form['update'] = [
+    '#type' => 'submit',
+    '#value' => t('Export active configuration to staging'),
+  ];
+
+  return $form;
+}
+
+/**
+ * Form submission handler for exporting configuration.
+ */
+function config_direct_save_update_configuration_form_submit($form, &$form_state) {
+  global $config_directories;
+
+  $staging_directory = $config_directories['staging'];
+  $active_directory = $config_directories['active'];
+  $backup = !empty($form_state['values']['backup']);
+
+  config_direct_save_export_to_staging($active_directory, $staging_directory, $backup);
+}
+
+
+
+/**
+ * Exports configuration files from active to the staging directory.
+ */
+function config_direct_save_export_to_staging($source_directory, $staging_directory, $backup) {
+  // Ensure the staging directory exists.
+  if (!is_dir($staging_directory)) {
+    mkdir($staging_directory, 0775, TRUE);
+  }
+
+  // Create a backup of the staging directory if the backup option is selected.
+  if ($backup) {
+    $backup_dir = $staging_directory . '-' . date('Y-m-d-H-i-s');
+    config_direct_save_recurse_copy($staging_directory, $backup_dir);
+  }
+
+  // List all .yml files in the active directory.
+  foreach (scandir($source_directory) as $file) {
+    if (pathinfo($file, PATHINFO_EXTENSION) === 'json') {
+      $source_path = $source_directory . '/' . $file;
+      $destination_path = $staging_directory . '/' . $file;
+
+      // Copy each configuration file from active to staging.
+      if (copy($source_path, $destination_path) === FALSE) {
+        watchdog('config_direct_save', 'Failed to copy file %file', ['%file' => $file], WATCHDOG_ERROR);
+      }
+    }
+  }
+
+  backdrop_set_message(t('The active configuration has been exported to the staging directory.'));
+}
+
+/**
+ * Recursively copy directory contents for backup.
+ */
+function config_direct_save_recurse_copy($src, $dst) {
+  if (!is_dir($dst)) {
+    mkdir($dst, 0775, TRUE);
+  }
+  foreach (scandir($src) as $file) {
+    if ($file != '.' && $file != '..') {
+      $src_file = "$src/$file";
+      $dst_file = "$dst/$file";
+      if (is_dir($src_file)) {
+        config_direct_save_recurse_copy($src_file, $dst_file);
+      } else {
+        copy($src_file, $dst_file);
+      }
+    }
   }
 }
