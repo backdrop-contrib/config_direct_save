@@ -4,7 +4,7 @@ Config Direct Save allow you to :
 - Make backup of configurations (when you check the backup checkbox).
 - Directly Export the Active config to the Staging config from the UI.
 
-You should before using the module : :
+You should before using the module :
 - Give access ( chmod -R 775 sites/default/files/config_HASH, HASH= Random string) for overriding the directory sync and creating a new directories.
 
 ## Installation
