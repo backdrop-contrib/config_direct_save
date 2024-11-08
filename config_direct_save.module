@@ -28,9 +28,9 @@ function config_direct_save_update_configuration_form($form, &$form_state) {
     '#type' => 'select',
     '#title' => t('Config source'),
     '#description' => t('Select config source directory'),
-    '#options' => ['staging' => t('Staging')], // Only one option.
+    '#options' => ['staging' => t('Staging')],
     '#default_value' => 'staging',
-    '#disabled' => FALSE, // Disabled to show it's not editable.
+    '#disabled' => TRUE, // Set to TRUE to make the field non-editable.
   ];
 
   $form['backup'] = [
@@ -51,53 +51,68 @@ function config_direct_save_update_configuration_form($form, &$form_state) {
  * Form submission handler for exporting configuration.
  */
 function config_direct_save_update_configuration_form_submit($form, &$form_state) {
-  $staging_directory = config_get_config_directory('staging');
+  $staging_storage = config_direct_save_get_storage('staging');
   $backup = !empty($form_state['values']['backup']);
-  config_direct_save_export_to_staging($staging_directory, $backup);
+
+  config_direct_save_export_to_staging($staging_storage, $backup);
 }
 
 /**
- * Exports configuration files from active to the staging directory.
+ * Exports configuration files from active to the staging configuration.
  *
- * @param string $staging_directory
- *   The staging configuration directory path.
+ * @param object $staging_storage
+ *   The staging configuration storage object.
  * @param bool $backup
- *   Whether to create a backup of the staging directory.
+ *   Whether to create a backup of the staging configuration.
  */
-function config_direct_save_export_to_staging($staging_directory, $backup) {
-  // Ensure the staging directory exists.
-  if (!is_dir($staging_directory)) {
-    mkdir($staging_directory, 0775, TRUE);
-  }
-
-  // Create a backup of the staging directory if the backup option is selected.
-  if ($backup) {
-    $backup_dir = $staging_directory . '-' . date('Y-m-d-H-i-s');
-    config_direct_save_recurse_copy($staging_directory, $backup_dir);
-  }
-
-  // Get the storage object for active configuration.
-  $active_storage = config_get_config_storage('active');
-
-  // Retrieve all configuration names by calling config_get_names_with_prefix() with an empty prefix.
+function config_direct_save_export_to_staging($staging_storage, $backup) {
+  $active_storage = config_direct_save_get_storage('active');
   $config_names = config_get_names_with_prefix('');
 
-  // Export each configuration item.
-  foreach ($config_names as $config_name) {
-    // Fetch configuration data from the active storage.
-    $config_data = $active_storage->read($config_name);
-
-    // Convert the configuration data to JSON.
-    $json_data = json_encode($config_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-    // Write the JSON data to the corresponding file in the staging directory.
-    $destination_path = $staging_directory . '/' . $config_name . '.json';
-    if (file_put_contents($destination_path, $json_data) === FALSE) {
-      watchdog('config_direct_save', 'Failed to write configuration file %file', ['%file' => $destination_path], WATCHDOG_ERROR);
+  // If backup is selected, create a backup of the current staging configuration.
+  if ($backup) {
+    foreach ($config_names as $config_name) {
+      $staging_data = $staging_storage->read($config_name);
+      if ($staging_data !== NULL) {
+        $backup_name = 'backup_' . date('Ymd_His') . '_' . $config_name;
+        if ($staging_storage->write($backup_name, $staging_data) === FALSE) {
+          watchdog('config_direct_save', 'Failed to create backup for %config', ['%config' => $config_name], WATCHDOG_ERROR);
+        }
+      }
     }
   }
 
-  backdrop_set_message(t('The active configuration has been exported to the staging directory.'));
+  // Export each configuration item from active to staging.
+  foreach ($config_names as $config_name) {
+    $config_data = $active_storage->read($config_name);
+    if ($config_data !== NULL) {
+      if ($staging_storage->write($config_name, $config_data) === FALSE) {
+        watchdog('config_direct_save', 'Failed to write configuration %config to staging', ['%config' => $config_name], WATCHDOG_ERROR);
+      }
+    }
+  }
+
+  backdrop_set_message(t('The active configuration has been exported to the staging configuration.'));
+}
+
+/**
+ * Helper function to get the configuration storage object.
+ *
+ * @param string $type
+ *   The type of configuration storage, either 'active' or 'staging'.
+ *
+ * @return object
+ *   The configuration storage object, either ConfigDatabaseStorage or ConfigFileStorage.
+ */
+function config_direct_save_get_storage($type) {
+  $storage_class = config_get('system.core', "config_{$type}_class");
+
+  if ($storage_class === 'ConfigDatabaseStorage') {
+    return new ConfigDatabaseStorage();
+  } else {
+    $directory = config_get_config_directory($type);
+    return new ConfigFileStorage($directory);
+  }
 }
 
 /**
