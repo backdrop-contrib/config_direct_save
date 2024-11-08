@@ -13,7 +13,7 @@ function config_direct_save_menu() {
     'access callback' => 'user_access',
     'access arguments' => ['administer site configuration'],
     'type' => MENU_LOCAL_TASK,
-    'weight' => 1,
+    'weight' => 5,
   ];
 
   return $items;
@@ -23,8 +23,6 @@ function config_direct_save_menu() {
  * Build the update configuration form.
  */
 function config_direct_save_update_configuration_form($form, &$form_state) {
-  global $config_directories;
-
   // Dropdown with "Staging" as the only option, for consistency with Drupal module UI.
   $form['config_directory'] = [
     '#type' => 'select',
@@ -53,21 +51,21 @@ function config_direct_save_update_configuration_form($form, &$form_state) {
  * Form submission handler for exporting configuration.
  */
 function config_direct_save_update_configuration_form_submit($form, &$form_state) {
-  global $config_directories;
-
-  $staging_directory = $config_directories['staging'];
-  $active_directory = $config_directories['active'];
+  $staging_directory = config_get_config_directory('staging');
   $backup = !empty($form_state['values']['backup']);
-
-  config_direct_save_export_to_staging($active_directory, $staging_directory, $backup);
+  dpm($staging_directory);
+  config_direct_save_export_to_staging($staging_directory, $backup);
 }
-
-
 
 /**
  * Exports configuration files from active to the staging directory.
+ *
+ * @param string $staging_directory
+ *   The staging configuration directory path.
+ * @param bool $backup
+ *   Whether to create a backup of the staging directory.
  */
-function config_direct_save_export_to_staging($source_directory, $staging_directory, $backup) {
+function config_direct_save_export_to_staging($staging_directory, $backup) {
   // Ensure the staging directory exists.
   if (!is_dir($staging_directory)) {
     mkdir($staging_directory, 0775, TRUE);
@@ -79,16 +77,25 @@ function config_direct_save_export_to_staging($source_directory, $staging_direct
     config_direct_save_recurse_copy($staging_directory, $backup_dir);
   }
 
-  // List all .yml files in the active directory.
-  foreach (scandir($source_directory) as $file) {
-    if (pathinfo($file, PATHINFO_EXTENSION) === 'json') {
-      $source_path = $source_directory . '/' . $file;
-      $destination_path = $staging_directory . '/' . $file;
+  // Get the storage object for active configuration.
+  $active_storage = config_get_config_storage('active');
+  dpm($active_storage);
 
-      // Copy each configuration file from active to staging.
-      if (copy($source_path, $destination_path) === FALSE) {
-        watchdog('config_direct_save', 'Failed to copy file %file', ['%file' => $file], WATCHDOG_ERROR);
-      }
+  // Retrieve all configuration names by calling config_get_names_with_prefix() with an empty prefix.
+  $config_names = config_get_names_with_prefix('');
+
+  // Export each configuration item.
+  foreach ($config_names as $config_name) {
+    // Fetch configuration data from the active storage.
+    $config_data = $active_storage->read($config_name);
+
+    // Convert the configuration data to JSON.
+    $json_data = json_encode($config_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+    // Write the JSON data to the corresponding file in the staging directory.
+    $destination_path = $staging_directory . '/' . $config_name . '.json';
+    if (file_put_contents($destination_path, $json_data) === FALSE) {
+      watchdog('config_direct_save', 'Failed to write configuration file %file', ['%file' => $destination_path], WATCHDOG_ERROR);
     }
   }
 
@@ -97,6 +104,11 @@ function config_direct_save_export_to_staging($source_directory, $staging_direct
 
 /**
  * Recursively copy directory contents for backup.
+ *
+ * @param string $src
+ *   The source directory path.
+ * @param string $dst
+ *   The destination directory path.
  */
 function config_direct_save_recurse_copy($src, $dst) {
   if (!is_dir($dst)) {
