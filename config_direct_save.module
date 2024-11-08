@@ -53,7 +53,6 @@ function config_direct_save_update_configuration_form($form, &$form_state) {
 function config_direct_save_update_configuration_form_submit($form, &$form_state) {
   $staging_directory = config_get_config_directory('staging');
   $backup = !empty($form_state['values']['backup']);
-  dpm($staging_directory);
   config_direct_save_export_to_staging($staging_directory, $backup);
 }
 
@@ -79,7 +78,6 @@ function config_direct_save_export_to_staging($staging_directory, $backup) {
 
   // Get the storage object for active configuration.
   $active_storage = config_get_config_storage('active');
-  dpm($active_storage);
 
   // Retrieve all configuration names by calling config_get_names_with_prefix() with an empty prefix.
   $config_names = config_get_names_with_prefix('');
