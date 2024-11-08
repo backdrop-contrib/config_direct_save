@@ -1,8 +1,11 @@
-# Lebowski
+# Config Direct Save
 
-Let me explain something to you. Um, I am not "Mr. Lebowski". You're Mr. Lebowski. I'm the Dude. So that's what you call me. You know, that or, uh, His Dudeness, or uh, Duder, or El Duderino if you're not into the whole brevity thing.
+Config Direct Save allow you to :
+- Make backup of configurations (when you check the backup checkbox).
+- Directly Export the Active config to the Staging config from the UI.
 
-This module will generate random Lebowski quotes and maybe other cool stuff.
+You should before using the module : :
+- Give access ( chmod -R 775 sites/default/files/config_HASH, HASH= Random string) for overriding the directory sync and creating a new directories.
 
 ## Installation
 
@@ -10,7 +13,7 @@ This module will generate random Lebowski quotes and maybe other cool stuff.
 
 ## Issues
 
-Bugs and feature requests should be reported in the [Issue Queue](https://github.com/backdrop-contrib/lebowski/issues).
+Bugs and feature requests should be reported in the [Issue Queue](https://github.com/backdrop-contrib/config_direct_save/issues).
 
 ## Current Maintainer
 
@@ -19,7 +22,7 @@ Bugs and feature requests should be reported in the [Issue Queue](https://github
 ## Credits
 
 - Ported to Backdrop CMS by [Justin Keiser](https://github.com/keiserjb).
-- Created for Drupal by [Jason Yee](https://www.drupal.org/u/jyee).
+- Created for Drupal by [Mohamed Anis Taktak (matio89)](https://www.drupal.org/u/matio89).
 
 ## License
 
