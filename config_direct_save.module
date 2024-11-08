@@ -23,20 +23,20 @@ function config_direct_save_menu() {
  * Build the update configuration form.
  */
 function config_direct_save_update_configuration_form($form, &$form_state) {
-  // Dropdown with "Staging" as the only option, for consistency with Drupal module UI.
+  // Display "Staging" as the only option for consistency.
   $form['config_directory'] = [
     '#type' => 'select',
     '#title' => t('Config source'),
     '#description' => t('Select config source directory'),
     '#options' => ['staging' => t('Staging')],
     '#default_value' => 'staging',
-    '#disabled' => TRUE, // Set to TRUE to make the field non-editable.
+    '#disabled' => TRUE, // Makes the field non-editable.
   ];
 
   $form['backup'] = [
     '#type' => 'checkbox',
     '#title' => t('Backup'),
-    '#description' => t('Check to make a backup of the staging directory before exporting.'),
+    '#description' => t('Check to make a backup of the staging configuration.'),
   ];
 
   $form['update'] = [
@@ -51,44 +51,42 @@ function config_direct_save_update_configuration_form($form, &$form_state) {
  * Form submission handler for exporting configuration.
  */
 function config_direct_save_update_configuration_form_submit($form, &$form_state) {
-  $staging_storage = config_direct_save_get_storage('staging');
   $backup = !empty($form_state['values']['backup']);
-
-  config_direct_save_export_to_staging($staging_storage, $backup);
+  config_direct_save_export_to_staging($backup);
 }
 
 /**
- * Exports configuration files from active to the staging configuration.
+ * Exports configuration from active to staging, with optional filesystem backup.
  *
- * @param object $staging_storage
- *   The staging configuration storage object.
  * @param bool $backup
  *   Whether to create a backup of the staging configuration.
  */
-function config_direct_save_export_to_staging($staging_storage, $backup) {
-  $active_storage = config_direct_save_get_storage('active');
+function config_direct_save_export_to_staging($backup) {
+  $active_storage = config_get_config_storage('active');
+  $staging_storage = config_get_config_storage('staging');
   $config_names = config_get_names_with_prefix('');
 
-  // If backup is selected, create a backup of the current staging configuration.
+  // Backup in the root config directory if selected.
   if ($backup) {
+    $config_root_directory = dirname(config_get_config_directory('active'));
+    $backup_directory = $config_root_directory . '/backup_' . date('Ymd_His');
+    mkdir($backup_directory, 0775, TRUE);
+
+    $backup_storage = new ConfigFileStorage($backup_directory);
     foreach ($config_names as $config_name) {
       $staging_data = $staging_storage->read($config_name);
-      if ($staging_data !== NULL) {
-        $backup_name = 'backup_' . date('Ymd_His') . '_' . $config_name;
-        if ($staging_storage->write($backup_name, $staging_data) === FALSE) {
-          watchdog('config_direct_save', 'Failed to create backup for %config', ['%config' => $config_name], WATCHDOG_ERROR);
-        }
+      if ($staging_data) {
+        $backup_storage->write($config_name, $staging_data);
       }
     }
+    watchdog('config_direct_save', 'Backup completed in directory %directory', ['%directory' => $backup_directory], WATCHDOG_INFO);
   }
 
   // Export each configuration item from active to staging.
   foreach ($config_names as $config_name) {
     $config_data = $active_storage->read($config_name);
-    if ($config_data !== NULL) {
-      if ($staging_storage->write($config_name, $config_data) === FALSE) {
-        watchdog('config_direct_save', 'Failed to write configuration %config to staging', ['%config' => $config_name], WATCHDOG_ERROR);
-      }
+    if ($config_data) {
+      $staging_storage->write($config_name, $config_data);
     }
   }
 
@@ -105,15 +103,18 @@ function config_direct_save_export_to_staging($staging_storage, $backup) {
  *   The configuration storage object, either ConfigDatabaseStorage or ConfigFileStorage.
  */
 function config_direct_save_get_storage($type) {
-  $storage_class = config_get('system.core', "config_{$type}_class");
+  // Use Backdrop’s built-in function to retrieve the correct storage object.
+  $storage = config_get_config_storage($type);
 
-  if ($storage_class === 'ConfigDatabaseStorage') {
-    return new ConfigDatabaseStorage();
-  } else {
-    $directory = config_get_config_directory($type);
-    return new ConfigFileStorage($directory);
-  }
+  // Log which storage class is being used for debugging.
+  $class_name = get_class($storage);
+  watchdog('config_direct_save', "Using $class_name for $type storage.", [], WATCHDOG_DEBUG);
+
+  return $storage;
 }
+
+
+
 
 /**
  * Recursively copy directory contents for backup.
