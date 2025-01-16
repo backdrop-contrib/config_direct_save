@@ -56,19 +56,7 @@ function config_direct_save_update_configuration_form_submit($form, &$form_state
 }
 
 /**
- * Exports configuration from active to staging, with optional filesystem backup.
- *
- * @param bool $backup
- *   Whether to create a backup of the staging configuration.
- */
-/**
- * Exports configuration from active to staging, with optional filesystem backup.
- *
- * @param bool $backup
- *   Whether to create a backup of the staging configuration.
- */
-/**
- * Exports configuration from active to staging, with optional filesystem backup.
+ * Exports configuration from active to staging, with optional backup.
  *
  * @param bool $backup
  *   Whether to create a backup of the staging configuration.
@@ -76,17 +64,9 @@ function config_direct_save_update_configuration_form_submit($form, &$form_state
 function config_direct_save_export_to_staging($backup) {
   $active_storage = config_get_config_storage('active');
   $staging_storage = config_get_config_storage('staging');
-
-  // Ensure staging storage is file-based.
-  if (!$staging_storage instanceof ConfigFileStorage) {
-    watchdog('config_direct_save', 'Staging configuration storage is not file-based. Clearing directory skipped.', [], WATCHDOG_WARNING);
-    backdrop_set_message(t('The staging configuration storage is not file-based. Clearing directory was skipped.'), 'warning');
-    return;
-  }
-
   $config_names = config_get_names_with_prefix('');
 
-  // Backup in the root config directory if selected.
+  // Backup if selected.
   if ($backup) {
     $config_root_directory = dirname(config_get_config_directory('active'));
     $backup_directory = $config_root_directory . '/backup_' . date('Ymd_His');
@@ -102,9 +82,19 @@ function config_direct_save_export_to_staging($backup) {
     watchdog('config_direct_save', 'Backup completed in directory %directory', ['%directory' => $backup_directory], WATCHDOG_INFO);
   }
 
-  // Clear the staging directory before exporting.
-  $staging_directory = config_get_config_directory('staging');
-  config_direct_save_clear_directory($staging_directory);
+  // Clear existing staging configurations.
+  if ($staging_storage instanceof ConfigFileStorage) {
+    $staging_directory = config_get_config_directory('staging');
+    config_direct_save_clear_directory($staging_directory);
+  }
+  elseif ($staging_storage instanceof ConfigDatabaseStorage) {
+    db_delete('config')->condition('collection', 'staging')->execute();
+    watchdog('config_direct_save', 'Cleared staging configuration from the database.', [], WATCHDOG_INFO);
+  }
+  else {
+    backdrop_set_message(t('Unsupported staging storage type. Clearing staging configuration was skipped.'), 'error');
+    return;
+  }
 
   // Export each configuration item from active to staging.
   foreach ($config_names as $config_name) {
