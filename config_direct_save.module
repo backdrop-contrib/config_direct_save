@@ -61,9 +61,29 @@ function config_direct_save_update_configuration_form_submit($form, &$form_state
  * @param bool $backup
  *   Whether to create a backup of the staging configuration.
  */
+/**
+ * Exports configuration from active to staging, with optional filesystem backup.
+ *
+ * @param bool $backup
+ *   Whether to create a backup of the staging configuration.
+ */
+/**
+ * Exports configuration from active to staging, with optional filesystem backup.
+ *
+ * @param bool $backup
+ *   Whether to create a backup of the staging configuration.
+ */
 function config_direct_save_export_to_staging($backup) {
   $active_storage = config_get_config_storage('active');
   $staging_storage = config_get_config_storage('staging');
+
+  // Ensure staging storage is file-based.
+  if (!$staging_storage instanceof ConfigFileStorage) {
+    watchdog('config_direct_save', 'Staging configuration storage is not file-based. Clearing directory skipped.', [], WATCHDOG_WARNING);
+    backdrop_set_message(t('The staging configuration storage is not file-based. Clearing directory was skipped.'), 'warning');
+    return;
+  }
+
   $config_names = config_get_names_with_prefix('');
 
   // Backup in the root config directory if selected.
@@ -82,6 +102,10 @@ function config_direct_save_export_to_staging($backup) {
     watchdog('config_direct_save', 'Backup completed in directory %directory', ['%directory' => $backup_directory], WATCHDOG_INFO);
   }
 
+  // Clear the staging directory before exporting.
+  $staging_directory = config_get_config_directory('staging');
+  config_direct_save_clear_directory($staging_directory);
+
   // Export each configuration item from active to staging.
   foreach ($config_names as $config_name) {
     $config_data = $active_storage->read($config_name);
@@ -91,6 +115,26 @@ function config_direct_save_export_to_staging($backup) {
   }
 
   backdrop_set_message(t('The active configuration has been exported to the staging configuration.'));
+}
+
+/**
+ * Helper function to clear all files in a directory.
+ *
+ * @param string $directory
+ *   The path to the directory to clear.
+ */
+function config_direct_save_clear_directory($directory) {
+  foreach (scandir($directory) as $file) {
+    if ($file != '.' && $file != '..') {
+      $file_path = "$directory/$file";
+      if (is_dir($file_path)) {
+        config_direct_save_clear_directory($file_path);
+        rmdir($file_path);
+      } else {
+        unlink($file_path);
+      }
+    }
+  }
 }
 
 /**
@@ -112,9 +156,6 @@ function config_direct_save_get_storage($type) {
 
   return $storage;
 }
-
-
-
 
 /**
  * Recursively copy directory contents for backup.
