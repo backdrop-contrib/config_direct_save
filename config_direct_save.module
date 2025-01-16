@@ -56,7 +56,7 @@ function config_direct_save_update_configuration_form_submit($form, &$form_state
 }
 
 /**
- * Exports configuration from active to staging, with optional backup.
+ * Exports configuration from active to staging, with optional filesystem backup.
  *
  * @param bool $backup
  *   Whether to create a backup of the staging configuration.
@@ -66,7 +66,7 @@ function config_direct_save_export_to_staging($backup) {
   $staging_storage = config_get_config_storage('staging');
   $config_names = config_get_names_with_prefix('');
 
-  // Backup if selected.
+  // Backup in the root config directory if selected.
   if ($backup) {
     $config_root_directory = dirname(config_get_config_directory('active'));
     $backup_directory = $config_root_directory . '/backup_' . date('Ymd_His');
