@@ -82,6 +82,20 @@ function config_direct_save_export_to_staging($backup) {
     watchdog('config_direct_save', 'Backup completed in directory %directory', ['%directory' => $backup_directory], WATCHDOG_INFO);
   }
 
+  // Clear existing staging configurations.
+  if ($staging_storage instanceof ConfigFileStorage) {
+    $staging_directory = config_get_config_directory('staging');
+    config_direct_save_clear_directory($staging_directory);
+  }
+  elseif ($staging_storage instanceof ConfigDatabaseStorage) {
+    db_delete('config')->condition('collection', 'staging')->execute();
+    watchdog('config_direct_save', 'Cleared staging configuration from the database.', [], WATCHDOG_INFO);
+  }
+  else {
+    backdrop_set_message(t('Unsupported staging storage type. Clearing staging configuration was skipped.'), 'error');
+    return;
+  }
+
   // Export each configuration item from active to staging.
   foreach ($config_names as $config_name) {
     $config_data = $active_storage->read($config_name);
@@ -91,6 +105,26 @@ function config_direct_save_export_to_staging($backup) {
   }
 
   backdrop_set_message(t('The active configuration has been exported to the staging configuration.'));
+}
+
+/**
+ * Helper function to clear all files in a directory.
+ *
+ * @param string $directory
+ *   The path to the directory to clear.
+ */
+function config_direct_save_clear_directory($directory) {
+  foreach (scandir($directory) as $file) {
+    if ($file != '.' && $file != '..') {
+      $file_path = "$directory/$file";
+      if (is_dir($file_path)) {
+        config_direct_save_clear_directory($file_path);
+        rmdir($file_path);
+      } else {
+        unlink($file_path);
+      }
+    }
+  }
 }
 
 /**
@@ -112,9 +146,6 @@ function config_direct_save_get_storage($type) {
 
   return $storage;
 }
-
-
-
 
 /**
  * Recursively copy directory contents for backup.
